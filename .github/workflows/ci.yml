@@ -25,5 +25,8 @@ jobs:
     - name: Manifests
       run: make manifests && git diff --exit-code
 
+    - nmmw: Bundle
+      run: make bundle && git diff --exit-code
+
     - name: Test
       run: make test
