@@ -10,7 +10,7 @@ jobs:
     name: Build and push a tag image
     runs-on: ubuntu-18.04
     env:
-      IMAGE_REGISTRY: quay.io/opdev
+      IMAGE_REGISTRY: ${{ secrets.IMAGE_REGISTRY }}
     steps:
     - uses: actions/checkout@v2
     - name: Set Env Tags
@@ -26,6 +26,10 @@ jobs:
           release_tag=${{ env.RELEASE_TAG }}
         dockerfiles: |
           ./Dockerfile
+
+    - name: Build Bundle
+      id: build-bundle
+      run: IMAGE_REGISTRY=${{ env.IMAGE_REGISTRY }} RELEASE_TAG=${{ env.RELEASE_TAG }} VERSION=${{ env.RELEASE_TAG }} make bundle
 
     - name: Build Bundle Image
       id: build-bundle-image

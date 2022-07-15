@@ -2,21 +2,21 @@ name: Build Main
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, ghactions ]
 
 jobs:
   build-main:
     name: Build and push a main snapshot image
     runs-on: ubuntu-18.04
     env:
-      IMAGE_REGISTRY: quay.io/opdev
+      IMAGE_REGISTRY: ${{ secrets.IMAGE_REGISTRY }}
     steps:
     - uses: actions/checkout@v2
     - name: Fetch latest release version
       uses: reloc8/action-latest-release-version@1.0.0
       id: fetch-latest-release
     - name: Set Env Tags
-      run: echo RELEASE_TAG=${{ steps.fetch-latest-release.outputs.latest-release }} >> $GITHUB_ENV
+      run: echo RELEASE_TAG=${{ steps.fetch-latest-release.outputs.latest-release }}-alpha >> $GITHUB_ENV
     - name: Set a default if release tag is empty
       if: ${{ steps.fetch-latest-release.outputs.latest-release }} == ""
       run: echo RELEASE_TAG=0.0.0 >> $GITHUB_ENV
@@ -29,9 +29,13 @@ jobs:
         tags: ${{ github.sha }} latest
         build-args: |
           quay_expiration=1w
-          release_tag=${{ env.RELEASE_TAG }}-alpha
+          release_tag=${{ env.RELEASE_TAG }}
         dockerfiles: |
           ./Dockerfile
+
+    - name: Build Bundle
+      id: build-bundle
+      run: IMAGE_REGISTRY=${{ env.IMAGE_REGISTRY }} RELEASE_TAG=${{ env.RELEASE_TAG }} VERSION=${{ env.RELEASE_TAG }} make bundle
 
     - name: Build Bundle Image
       id: build-bundle-image
@@ -51,7 +55,7 @@ jobs:
         registry: ${{ env.IMAGE_REGISTRY }}
         username: ${{ secrets.REGISTRY_USER }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
-    
+   
     - name: Push Bundle Image
       id: push-bundle-image
       uses: redhat-actions/push-to-registry@v2
@@ -61,6 +65,16 @@ jobs:
         registry: ${{ env.IMAGE_REGISTRY }}
         username: ${{ secrets.REGISTRY_USER }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
+    
+    - name: Push Bundle Image to ghcr.io - now
+      id: push-bundle-image-gh
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: operator-certification-operator-bundle
+        tags: ${{ steps.build-bundle-image.outputs.tags }}
+        registry: ${{ secrets.GH_IMAGE_REGISTRY }}
+        username: ${{ secrets.GH_REGISTRY_USER }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - run: echo "Operator Image pushed to ${{ steps.push-operator-image.outputs.registry-paths }}"
     - run: echo "Bundle Image pushed to ${{ steps.push-bundle-image.outputs.registry-paths }}"
